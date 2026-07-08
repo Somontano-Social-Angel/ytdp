@@ -1,12 +1,31 @@
+# MeTube + Caddy (basic auth) para Coolify — AUTOCONTENIDO.
+# El Caddyfile va embebido en configs.content (NO bind mount): evita el error
+# "not a directory" de Coolify al montar un fichero suelto.
+#
+# Usuario: admin   Password: cambiame   (CÁMBIALA -> ver README)
+# OJO: dentro de content los '$' del hash van DUPLICADOS ($$) porque Compose
+#      interpola variables. Si generas hash nuevo, duplica cada '$'.
+
+configs:
+  caddyfile:
+    content: |
+      :80 {
+      	basic_auth {
+      		admin $$2a$$14$$9R/KPHxzUjUOMgMrLQ61L.EgR.jqL.QFDIS7MpxxQi5K9qgYLLeBm
+      	}
+      	reverse_proxy metube:8081
+      }
+
 services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
     environment:
-      # Coolify inyecta el dominio y enruta Traefik -> este contenedor puerto 80
+      # Coolify inyecta dominio y enruta Traefik -> este contenedor puerto 80
       - SERVICE_FQDN_CADDY_80
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
     depends_on:
       - metube
 
@@ -20,6 +39,6 @@ services:
       MAX_CONCURRENT_DOWNLOADS: "3"
     volumes:
       - ./descargas:/downloads
-    # SIN ports: MeTube queda interno, solo accesible via Caddy
+    # SIN ports: MeTube interno, solo accesible via Caddy
     expose:
       - "8081"

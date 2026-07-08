@@ -1,8 +1,10 @@
 # MeTube + Basic Auth (para Coolify)
 
 Stack: **Caddy** (puerta con usuario/contraseña) → **MeTube** (interno, sin puerto expuesto).
-Coolify (Traefik) enruta y da HTTPS. La auth vive en este stack, así que no depende
-de tocar los nombres de router que Coolify autogenera.
+Coolify (Traefik) enruta y da HTTPS. La auth vive en este stack.
+
+Todo en un solo `docker-compose.yml` **autocontenido**: el Caddyfile va embebido en
+`configs.content` (sin bind mount), así Coolify no falla al montar un fichero suelto.
 
 ## Credenciales por defecto
 
@@ -11,43 +13,40 @@ de tocar los nombres de router que Coolify autogenera.
 
 ## Cambiar la contraseña
 
-Genera un hash bcrypt nuevo y pégalo en `Caddyfile`:
+1. Genera un hash bcrypt:
 
-```bash
-docker run --rm caddy:2-alpine caddy hash-password --plaintext 'TU_PASSWORD_NUEVA'
-```
+   ```bash
+   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'TU_PASSWORD_NUEVA'
+   ```
 
-Copia la línea que empieza por `$2a$...` y sustitúyela en `Caddyfile`:
+2. En `docker-compose.yml`, dentro de `configs.caddyfile.content`, sustituye el hash
+   de la línea `admin ...`.
 
-```
-basic_auth {
-    admin $2a$14$....(hash nuevo)....
-}
-```
+   > ⚠️ **Duplica cada `$`**: el hash sale como `$2a$14$...` y aquí debe quedar
+   > `$$2a$$14$$...` porque Docker Compose interpola variables. Si no lo duplicas,
+   > la contraseña no valida.
 
-Para cambiar también el usuario, sustituye `admin` por lo que quieras.
-Puedes añadir más usuarios con más líneas `usuario  hash` dentro del bloque.
+   Para cambiar el usuario, sustituye `admin`. Más usuarios = más líneas `usuario hash`.
 
-> Nota: el hash va en `Caddyfile` (fichero suelto), NO hace falta escapar `$`.
-> Si algún día metes el hash directo en `docker-compose.yml`, ahí sí hay que
-> duplicar cada `$` como `$$`.
+3. Commit + push. Redeploy en Coolify.
 
 ## Desplegar en Coolify
 
-1. Sube esta carpeta `coolify/` a un repo git (o usa "Docker Compose" pegando el compose).
-2. En Coolify: **New Resource → Docker Compose** apuntando al repo/carpeta.
-3. Coolify detecta `SERVICE_FQDN_CADDY_80` y te asigna dominio + HTTPS al servicio `caddy`.
-   - Si quieres tu propio dominio, ponlo en el campo Domains del servicio `caddy`.
-4. Deploy. Entra al dominio → te pedirá usuario/contraseña.
+1. **New Resource → Private Git** → conecta este repo.
+2. Base Directory `/`, usa `docker-compose.yml`.
+3. Coolify detecta `SERVICE_FQDN_CADDY_80` → dominio + HTTPS al servicio `caddy`.
+   Para dominio propio, ponlo en el campo Domains del servicio `caddy`.
+4. Deploy → pide usuario/contraseña.
 
-Las descargas quedan en el volumen `./descargas` (persístelo en Coolify si quieres
-que sobrevivan a redeploys: configúralo como Persistent Storage).
+Marca `descargas` como **Persistent Storage** en Coolify si quieres que las
+descargas sobrevivan a redeploys.
 
 ## Probar en local
 
 ```bash
-docker run --rm caddy:2-alpine caddy hash-password --plaintext 'test'   # si quieres otra pass
-# compose de prueba mapeando caddy a un puerto local:
-#   ports: ["8091:80"]  en el servicio caddy
-# luego:  curl -u admin:cambiame http://localhost:8091   -> HTTP 200
+# mapea caddy a un puerto y prueba:
+#   añade  ports: ["8092:80"]  al servicio caddy (Coolify no lo necesita, usa FQDN)
+docker compose up -d
+curl -u admin:cambiame http://localhost:8092   # -> HTTP 200
+curl http://localhost:8092                       # -> HTTP 401
 ```
