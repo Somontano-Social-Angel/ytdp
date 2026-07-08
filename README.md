@@ -4,49 +4,58 @@ Stack: **Caddy** (puerta con usuario/contraseña) → **MeTube** (interno, sin p
 Coolify (Traefik) enruta y da HTTPS. La auth vive en este stack.
 
 Todo en un solo `docker-compose.yml` **autocontenido**: el Caddyfile va embebido en
-`configs.content` (sin bind mount), así Coolify no falla al montar un fichero suelto.
+`configs.content` (sin bind mount, así Coolify no falla al montar un fichero suelto).
+El usuario y el hash se leen de **variables de entorno**.
 
 ## Credenciales por defecto
 
 - Usuario: `admin`
 - Contraseña: `cambiame`  ← **CÁMBIALA antes de exponerla a internet**
 
-## Cambiar la contraseña
+## Cambiar la contraseña (recomendado: env en Coolify, SIN tocar git)
 
 1. Genera un hash bcrypt:
 
    ```bash
-   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'TU_PASSWORD_NUEVA'
+   docker run --rm caddy:2-alpine caddy hash-password --plaintext 'TU_PASS_NUEVA'
    ```
 
-2. En `docker-compose.yml`, dentro de `configs.caddyfile.content`, sustituye el hash
-   de la línea `admin ...`.
+   Sale algo como `$2a$14$....`
 
-   > ⚠️ **Duplica cada `$`**: el hash sale como `$2a$14$...` y aquí debe quedar
-   > `$$2a$$14$$...` porque Docker Compose interpola variables. Si no lo duplicas,
-   > la contraseña no valida.
+2. En Coolify → tu recurso → **Environment Variables**, añade:
 
-   Para cambiar el usuario, sustituye `admin`. Más usuarios = más líneas `usuario hash`.
+   | Variable | Valor |
+   |----------|-------|
+   | `METUBE_USER` | el usuario que quieras (ej. `admin`) |
+   | `METUBE_HASH` | el hash **tal cual**, con sus `$` (ej. `$2a$14$....`) |
 
-3. Commit + push. Redeploy en Coolify.
+   > Aquí el hash va **crudo**, NO se duplican los `$`. Solo se duplican si lo
+   > escribieras dentro del compose; como va por env, no hace falta.
+
+3. **Redeploy**. Listo — sin commits ni push.
 
 ## Desplegar en Coolify
 
 1. **New Resource → Private Git** → conecta este repo.
 2. Base Directory `/`, usa `docker-compose.yml`.
 3. Coolify detecta `SERVICE_FQDN_CADDY_80` → dominio + HTTPS al servicio `caddy`.
-   Para dominio propio, ponlo en el campo Domains del servicio `caddy`.
-4. Deploy → pide usuario/contraseña.
+4. (Opcional pero recomendado) pon `METUBE_USER` / `METUBE_HASH` en Environment Variables.
+5. Deploy → pide usuario/contraseña.
 
-Marca `descargas` como **Persistent Storage** en Coolify si quieres que las
-descargas sobrevivan a redeploys.
+Marca `descargas` como **Persistent Storage** en Coolify para que las descargas
+sobrevivan a redeploys.
 
 ## Probar en local
 
 ```bash
-# mapea caddy a un puerto y prueba:
-#   añade  ports: ["8092:80"]  al servicio caddy (Coolify no lo necesita, usa FQDN)
+# defaults (admin/cambiame):
+docker compose up -d          # + añade  ports: ["8093:80"]  al servicio caddy para probar
+curl -u admin:cambiame http://localhost:8093     # 200
+curl http://localhost:8093                         # 401
+
+# con otra pass via env (hash crudo, sin duplicar $):
+export METUBE_USER=jefe
+export METUBE_HASH="$(docker run --rm caddy:2-alpine caddy hash-password --plaintext 'test1234')"
 docker compose up -d
-curl -u admin:cambiame http://localhost:8092   # -> HTTP 200
-curl http://localhost:8092                       # -> HTTP 401
+curl -u jefe:test1234 http://localhost:8093        # 200
 ```

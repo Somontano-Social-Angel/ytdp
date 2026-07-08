@@ -1,17 +1,20 @@
 # MeTube + Caddy (basic auth) para Coolify — AUTOCONTENIDO.
-# El Caddyfile va embebido en configs.content (NO bind mount): evita el error
-# "not a directory" de Coolify al montar un fichero suelto.
+# Caddyfile embebido (sin bind mount). Usuario y hash se leen de VARIABLES DE
+# ENTORNO -> para cambiar la contraseña editas el env en Coolify, sin tocar git.
 #
-# Usuario: admin   Password: cambiame   (CÁMBIALA -> ver README)
-# OJO: dentro de content los '$' del hash van DUPLICADOS ($$) porque Compose
-#      interpola variables. Si generas hash nuevo, duplica cada '$'.
+# Cambiar contraseña:
+#   1) genera hash:  docker run --rm caddy:2-alpine caddy hash-password --plaintext 'TU_PASS'
+#   2) en Coolify (Environment Variables) pon METUBE_HASH = ese hash TAL CUAL ($2a$14$...)
+#      y METUBE_USER = el usuario que quieras
+#   3) Redeploy
+# (Por defecto, sin env: admin / cambiame)
 
 configs:
   caddyfile:
     content: |
       :80 {
       	basic_auth {
-      		admin $$2a$$14$$9R/KPHxzUjUOMgMrLQ61L.EgR.jqL.QFDIS7MpxxQi5K9qgYLLeBm
+      		{$$METUBE_USER} {$$METUBE_HASH}
       	}
       	reverse_proxy metube:8081
       }
@@ -23,6 +26,9 @@ services:
     environment:
       # Coolify inyecta dominio y enruta Traefik -> este contenedor puerto 80
       - SERVICE_FQDN_CADDY_80
+      # user/hash de la basic auth (defaults: admin / cambiame)
+      - METUBE_USER=${METUBE_USER:-admin}
+      - METUBE_HASH=${METUBE_HASH:-$$2a$$14$$9R/KPHxzUjUOMgMrLQ61L.EgR.jqL.QFDIS7MpxxQi5K9qgYLLeBm}
     configs:
       - source: caddyfile
         target: /etc/caddy/Caddyfile
@@ -39,6 +45,5 @@ services:
       MAX_CONCURRENT_DOWNLOADS: "3"
     volumes:
       - ./descargas:/downloads
-    # SIN ports: MeTube interno, solo accesible via Caddy
     expose:
       - "8081"
