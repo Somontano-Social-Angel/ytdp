@@ -1,0 +1,25 @@
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      # Coolify inyecta el dominio y enruta Traefik -> este contenedor puerto 80
+      - SERVICE_FQDN_CADDY_80
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on:
+      - metube
+
+  metube:
+    image: ghcr.io/alexta69/metube:latest
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Madrid
+      OUTPUT_TEMPLATE: "%(title)s.%(ext)s"
+      DOWNLOAD_MODE: "concurrent"
+      MAX_CONCURRENT_DOWNLOADS: "3"
+    volumes:
+      - ./descargas:/downloads
+    # SIN ports: MeTube queda interno, solo accesible via Caddy
+    expose:
+      - "8081"

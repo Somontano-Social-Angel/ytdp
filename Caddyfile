@@ -1,0 +1,9 @@
+# Caddy hace de puerta: pide usuario/contraseña y reenvia a MeTube (interno).
+# Traefik de Coolify termina el HTTPS y reenvia aqui por HTTP interno.
+:80 {
+	basic_auth {
+		# usuario: admin  |  contraseña: cambiame  (CAMBIALA -> ver README)
+		admin $2a$14$9R/KPHxzUjUOMgMrLQ61L.EgR.jqL.QFDIS7MpxxQi5K9qgYLLeBm
+	}
+	reverse_proxy metube:8081
+}

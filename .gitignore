@@ -1,0 +1,7 @@
+# Descargas — no van al repo (persistir via Coolify Storage)
+descargas/
+!descargas/.gitkeep
+
+# ficheros de prueba temporales
+*.test.yml
+override*.yml
